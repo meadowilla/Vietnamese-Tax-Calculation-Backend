@@ -109,112 +109,113 @@ exports.logout = async (req, res) => {
 }
 
 /*GENERATE AND SEND OTP*/
-// when a user has forgotten their pwd, sends their email -> check if email exits in system or not
-// if exits -> an OTP is generated with an expiration time, stored in DB, and sent to email
-exports.forgotPassword = async (req, res) => {
-    try {
-        const { email } = req.body;
+exports.requestReset = async (req, res) => {
+  try {
+    const { email, newPassword, confirmNewPassword } = req.body;
 
-        // Tìm user trong DB
-        const user = await UserModel.findOne({ email });
-        if (!user) {
-            return res.status(400).json({ message: "User not found", status: "error" });
-        }
-
-        // Tạo OTP ngẫu nhiên và hash
-        const otp = crypto.randomInt(100000, 999999).toString();
-        const hashedOtp = await bcrypt.hash(otp, 10);
-
-        // Lưu OTP hash + thời gian hết hạn
-        user.resetOtp = hashedOtp;
-        user.otpExpiry = Date.now() + 5 * 60 * 1000; // 5 phút
-        user.failedAttempts = 0; // Reset lại số lần nhập sai OTP
-        await user.save();
-
-        // Cấu hình SMTP: user send email -> SMTP client -> Gmail SMTP server via Internet -> send to users via POP/IMP protocol
-        const transporter = nodemailer.createTransport({
-            service: "gmail", // email will be sent using Gmail SMTP server
-            auth: {
-                user: process.env.EMAIL_USER, // the email address of the our app
-                pass: process.env.EMAIL_PASS, // developer setup an email password for the app
-            }
-        });
-
-        // Kiểm tra SMTP trước khi gửi email
-        await transporter.verify();
-
-        // Gửi email
-        await transporter.sendMail({
-            from: process.env.EMAIL_USER,
-            to: email,
-            subject: "Password Reset OTP",
-            text: `Your OTP for password reset is: ${otp}. This OTP is valid for 5 minutes.`,
-        });
-
-        return res.status(200).json({
-            message: "OTP sent to your email",
-            status: "success",
-        });
-
-    } catch (error) {
-        console.error("Forgot Password Error:", error);
-        res.status(500).json({ message: "Internal Server Error" });
+    // Validate inputs
+    if (!email || !newPassword || !confirmNewPassword) {
+      return res.status(400).json({ message: "All fields are required" });
     }
+    if (newPassword !== confirmNewPassword) {
+      return res.status(400).json({ message: "Passwords do not match" });
+    }
+
+    // Find user
+    const user = await UserModel.findOne({ email });
+    if (!user) {
+      return res.status(400).json({ message: "Email does not exist!" });
+    }
+
+    // Generate OTP
+    const otp = crypto.randomInt(100000, 999999).toString();
+    const hashedOtp = await bcrypt.hash(otp, 10);
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+    // Save OTP and new password temporarily
+    user.resetOtp = hashedOtp;
+    user.otpExpiry = Date.now() + 5 * 60 * 1000;  // 5 minutes expiry
+    user.pendingNewPassword = hashedNewPassword;
+    user.failedAttempts = 0;
+    await user.save();
+
+    // Setup email transporter
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    // Verify transporter configuration
+    await transporter.verify();
+
+    // Send OTP email
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "Your OTP Code",
+      text: `Your OTP is ${otp}. It expires in 5 minutes.`,
+    });
+
+    return res.status(200).json({ message: "OTP sent to your email" });
+
+  } catch (err) {
+    console.error("Request Reset Error:", err);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
 };
 
-/*VALIDATE OTP AND UPDATE PASSWORD */
-// user send his new pwd + valid OTP
-// check if the OTP is valid -> allow to reset the password only if it is valid
-exports.resetPassword = async (req, res) => {
-    const { email, otp, newPassword, confirmNewPassword } = req.body;
+exports.verifyOtpAndReset = async (req, res) => {
+  const { email, otp } = req.body;
 
-    try {
-        // Tìm user trong DB
-        const user = await UserModel.findOne({ email });
-        if (!user) {
-            return res.status(400).json({ message: "User not found", status: "error" });
-        }
-
-        // Kiểm tra số lần nhập OTP sai
-        if (user.failedAttempts >= 5) {
-            return res.status(403).json({ message: "Too many failed attempts, try again later", status: "error" });
-        }
-
-        // Kiểm tra OTP hết hạn
-        if (!user.otpExpiry || Date.now() > user.otpExpiry) {
-            return res.status(400).json({ message: "OTP has expired", status: "error" });
-        }
-
-        // Kiểm tra OTP có đúng không
-        const isOtpValid = await bcrypt.compare(otp, user.resetOtp);
-        if (!isOtpValid) {
-            user.failedAttempts += 1; // Tăng số lần nhập sai
-            await user.save();
-            return res.status(400).json({ message: "Incorrect OTP", status: "error" });
-        }
-
-        // Kiểm tra mật khẩu nhập lại có trùng không
-        if (newPassword !== confirmNewPassword) {
-            return res.status(400).json({ message: "Passwords do not match", status: "error" });
-        }
-
-        // Hash mật khẩu mới
-        const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-        // Lưu mật khẩu mới và xóa OTP
-        user.password = hashedPassword;
-        user.resetOtp = undefined;
-        user.otpExpiry = undefined;
-        user.failedAttempts = 0; // Reset bộ đếm nhập sai
-        await user.save();
-
-        return res.status(200).json({ message: "Password reset successfully", status: "success" });
-
-    } catch (error) {
-        console.error("Reset Password Error:", error);
-        res.status(500).json({ message: "Internal Server Error" });
+  try {
+    const user = await UserModel.findOne({ email });
+    if (!user) {
+      return res.status(400).json({ message: "Invalid request" });
     }
-}; 
+
+    // Too many failed attempts
+    if (user.failedAttempts >= 5) {
+      return res.status(403).json({ message: "Too many failed attempts. Try again later." });
+    }
+
+    // Check OTP expiry and validity
+    if (!user.resetOtp || !user.otpExpiry || Date.now() > user.otpExpiry) {
+      return res.status(400).json({ message: "OTP has expired. Please request again." });
+    }
+
+    // Validate OTP
+    const isOtpValid = await bcrypt.compare(otp, user.resetOtp);
+    if (!isOtpValid) {
+      user.failedAttempts += 1;
+      await user.save();
+      return res.status(400).json({ message: "Invalid OTP" });
+    }
+
+    // Ensure password change is pending
+    if (!user.pendingNewPassword) {
+      return res.status(400).json({ message: "No pending password change found." });
+    }
+
+    // Reset password
+    user.password = user.pendingNewPassword;
+    user.resetOtp = undefined;
+    user.otpExpiry = undefined;
+    user.pendingNewPassword = undefined;
+    user.failedAttempts = 0;
+    await user.save();
+
+    return res.status(200).json({ message: "Password reset successfully" });
+
+  } catch (err) {
+    console.error("Verify OTP Error:", err);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+
 // exports.getUserByEmail = async (req, res) => {
     //     try {
         //         const email = req.params.email;
