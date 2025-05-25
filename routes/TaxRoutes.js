@@ -6,7 +6,7 @@ const {
     getTaxRecordsByUserId,
 } = require("../controllers/TaxController");
 
-router.route("/calculate-tax") // tính thuế khi chưa đăng nhậpnhập
+router.route("/calculate-tax") // tính thuế khi chưa đăng nhập
     .post(calculateTaxWithoutAuthUser);
 
 router.route("/calculate-tax-auth") // tính thuế khi đã đăng nhập
