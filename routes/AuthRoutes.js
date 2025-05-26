@@ -8,7 +8,7 @@ const {
     resetPassword
 } = require("../controllers/UserController");
 
-const {contactController} = require("../controllers/contactController");
+const { contactController, chatController } = require("../controllers/contactController");
 const router = express.Router();
 
 router.route("/").get(getAllUsers); // for debugging purposes
@@ -18,6 +18,7 @@ router.route("/logout").post(logout); // done
 
 router.route("/forgotPassword").post(forgotPassword); // done
 router.route("/resetPassword").post(resetPassword); // done
-router.route("/contact").post(contactController); 
+router.route("/contact").post(contactController); // done
+router.route("/chat").post(chatController)
 
 module.exports = router;
