@@ -24,6 +24,12 @@ exports.createUser = async (req, res) => {
         if (existingUser) {
             return res.status(400).json({ message: "Username already exists", status: "error" });
         }
+
+        const existingEmail = await UserModel.findOne({ email: _email });
+        if (existingEmail) {
+            return res.status(400).json({ message: "Email already exists", status: "error" });
+        }
+
         
         // Encrypt password
         const salt = await bcrypt.genSalt(10);
