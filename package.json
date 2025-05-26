@@ -16,12 +16,13 @@
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "crypto": "^1.0.1",
-    "dotenv": "^16.4.7",
+    "dotenv": "^16.5.0",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^7.8.6",
     "nodejs-crud-student": "file:",
     "nodemailer": "^6.10.0",
+    "openai": "^4.103.0",
     "vietnamese-tax-calculation": "file:"
   },
   "devDependencies": {
