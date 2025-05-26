@@ -4,8 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "server": "wsl bash -c \"source calculations/venvVTC/bin/activate && python calculations/Flask.py\"",
-    "start": "wsl bash -c \"npx nodemon index.js\""
+    "server": "python calculations/Flask.py",
+    "start": "npx nodemon index.js"
   },
   "keywords": [],
   "author": "",
@@ -21,7 +21,8 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^7.8.6",
     "nodejs-crud-student": "file:",
-    "nodemailer": "^6.10.0"
+    "nodemailer": "^6.10.0",
+    "vietnamese-tax-calculation": "file:"
   },
   "devDependencies": {
     "nodemon": "^3.1.9"

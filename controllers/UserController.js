@@ -231,6 +231,8 @@ exports.resetPassword = async (req, res) => {
 
         // Kiểm tra mật khẩu nhập lại có trùng không
         if (newPassword !== confirmNewPassword) {
+            console.log("newPassword:", newPassword);
+            console.log("confirmNewPassword:", confirmNewPassword);
             return res.status(400).json({ 
                 message: "Passwords do not match", 
                 success: false 
